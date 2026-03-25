@@ -54,8 +54,6 @@ This project is licensed under the **Creative Commons Attribution-NonCommercial-
 > * **Non-Commercial:** You may **not** use this material for commercial purposes (selling the app, charging for access, etc.).
 > * **ShareAlike:** If you remix, transform, or build upon the material, you must distribute your contributions under the same license as the original.
 
-[![CC BY-NC-SA](https://mirrors.creativecommons.org/presskit/buttons/88x31/png/by-nc-sa.png)](http://creativecommons.org/licenses/by-nc-sa/4.0/)
-
 ---
 
 ## 🛠️ Tech Stack
