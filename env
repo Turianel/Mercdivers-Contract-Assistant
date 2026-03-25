@@ -1,0 +1,4 @@
+DISCORD_TOKEN=
+GITHUB_TOKEN=
+GIST_ID=
+PROXY_URL=socks5://user:pass@ip:10800
