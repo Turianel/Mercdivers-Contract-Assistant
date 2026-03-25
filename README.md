@@ -30,7 +30,7 @@ This tool is a lightweight, non-intrusive overlay designed to display real-time 
 
 ## For those who want dive into code...
 
-**Almost every line of code was written by a Viber coder using Gemini.** 
+**Almost every line of code was written by a Vibecoder using Gemini.** 
 I'm not a programmer and I make no secret of it.
 So if you look at the code, you'll see comments in Russian and possibly some questionable coding decisions. However, my design functions as intended, doesn't break, and is as secure as possible.
 
