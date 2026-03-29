@@ -7,22 +7,79 @@ import win32gui
 import win32con
 import win32api
 import ctypes
+import configparser
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QSystemTrayIcon, QMenu
 from PyQt6.QtCore import Qt, QTimer, QPoint, QRect, QRectF, QThread, pyqtSignal
 from PyQt6.QtGui import (QPainter, QColor, QFont, QPen, QBrush, QPolygon, 
                          QTextDocument, QAbstractTextDocumentLayout, QPixmap, QIcon)
 
-# --- КОНФИГУРАЦИЯ ОБЛАКА ---
+# --- CLOUD CONFIGURATION ---
+# Replace with your actual Gist data
 GIST_RAW_URL = "https://gist.githubusercontent.com/Turianel/f25010ca0aa2b8e39cc1185bc67d4746/raw/latest_transmission.json"
 
+# --- KEYBINDING MAPPING ---
+# VK_MENU covers both Alts. VK_LMENU/VK_RMENU are specific.
+VK_MAP = {
+    'NUMPAD0': win32con.VK_NUMPAD0, 'NUMPAD1': win32con.VK_NUMPAD1,
+    'NUMPAD2': win32con.VK_NUMPAD2, 'NUMPAD3': win32con.VK_NUMPAD3,
+    'ALT': win32con.VK_MENU,       # Both Alts
+    'LALT': win32con.VK_LMENU,     # Left Alt only
+    'RALT': win32con.VK_RMENU,     # Right Alt only
+    'CTRL': win32con.VK_CONTROL,   # Both Ctrls
+    'LCTRL': win32con.VK_LCONTROL, # Left Ctrl only
+    'RCTRL': win32con.VK_RCONTROL, # Right Ctrl only
+    'SHIFT': win32con.VK_SHIFT,    # Both Shifts
+    'LSHIFT': win32con.VK_LSHIFT,
+    'F1': win32con.VK_F1, 'F2': win32con.VK_F2, 'F3': win32con.VK_F3,
+    'F4': win32con.VK_F4, 'F5': win32con.VK_F5, 'F6': win32con.VK_F6,
+    'F7': win32con.VK_F7, 'F8': win32con.VK_F8, 'F9': win32con.VK_F9,
+    'F10': win32con.VK_F10, 'F11': win32con.VK_F11, 'F12': win32con.VK_F12,
+    'TILDE': 0xC0, 'INSERT': win32con.VK_INSERT, 'HOME': win32con.VK_HOME,
+    'XBUTTON1': win32con.VK_XBUTTON1, 'XBUTTON2': win32con.VK_XBUTTON2,
+}
+
 def resource_path(relative_path):
-    """ Получает абсолютный путь к ресурсам, работает для dev и для PyInstaller """
+    """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
-        # PyInstaller создает временную папку _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
+
+def get_settings_path():
+    """ Return the path to settings.ini next to the executable """
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, "settings.ini")
+
+def load_settings():
+    """ Load settings from ini file or create defaults if missing """
+    config = configparser.ConfigParser()
+    settings_path = get_settings_path()
+    
+    defaults = {
+        'toggle_overlay': 'NUMPAD0',
+        'interactive_mode': 'ALT', # Default responds to both Alts
+        'force_update': 'F5'
+    }
+
+    if not os.path.exists(settings_path):
+        config['Keybinds'] = defaults
+        try:
+            with open(settings_path, 'w') as f:
+                config.write(f)
+        except Exception as e:
+            print(f"Failed to create settings.ini: {e}")
+        return defaults
+
+    config.read(settings_path)
+    return {
+        'toggle_overlay': config['Keybinds'].get('toggle_overlay', 'NUMPAD0').upper(),
+        'interactive_mode': config['Keybinds'].get('interactive_mode', 'ALT').upper(),
+        'force_update': config['Keybinds'].get('force_update', 'F5').upper()
+    }
 
 class MercParser:
     @staticmethod
@@ -128,10 +185,8 @@ class MercOverlayWidget(QWidget):
         self.accent_green = QColor("#73c229")
         self.accent_cyan = QColor("#00ffff")
         
-        # Загрузка ресурсов
         logo_path = resource_path("PMC_Logo.webp")
         self.logo_pixmap = QPixmap(logo_path) if os.path.exists(logo_path) else QPixmap()
-        
         self.sc_icon_path = resource_path("supercredits.png").replace("\\", "/")
         
         self.scroll_offsets = {"OBJECTIVES": 0.0, "REWARD": 0.0, "BOUNTIES": 0.0, "COND_ROW": 0.0, "DEADLINE": 0.0}
@@ -206,34 +261,31 @@ class MercOverlayWidget(QWidget):
         painter.restore()
 
     def paintEvent(self, event):
-        try:
-            painter = QPainter(self)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            w, h = self.width(), self.height()
-            cut = 30
-            points = [QPoint(0,0), QPoint(w,0), QPoint(w, h-cut), QPoint(w-cut, h), QPoint(0,h)]
-            painter.setPen(QPen(self.accent_yellow, 2))
-            painter.setBrush(QBrush(self.bg_color))
-            painter.drawPolygon(QPolygon(points))
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        cut = 30
+        points = [QPoint(0,0), QPoint(w,0), QPoint(w, h-cut), QPoint(w-cut, h), QPoint(0,h)]
+        painter.setPen(QPen(self.accent_yellow, 2))
+        painter.setBrush(QBrush(self.bg_color))
+        painter.drawPolygon(QPolygon(points))
+        
+        self.draw_header(painter)
+        self.draw_tabs(painter, w)
+        
+        item = self.data.get(self.current_tab)
+        if not item:
+            painter.setPen(QColor(100, 100, 100)); painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Medium))
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "ESTABLISHING UPLINK...")
+            return
             
-            self.draw_header(painter)
-            self.draw_tabs(painter, w)
-            
-            item = self.data.get(self.current_tab)
-            if not item:
-                painter.setPen(QColor(100, 100, 100)); painter.setFont(QFont("Segoe UI", 10, QFont.Weight.Medium))
-                painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "ESTABLISHING UPLINK...")
-                return
-                
-            painter.setPen(QColor(240, 240, 240)); painter.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
-            painter.drawText(15, 145, item['title'])
-            
-            if self.current_tab == "CONTRACTS": self.draw_contracts_view(painter, item, w, h)
-            else: self.draw_bounties_view(painter, item, w, h)
-            
-            self.draw_footer(painter, w, h)
-        except Exception as e:
-            print(f"Paint Error: {e}")
+        painter.setPen(QColor(240, 240, 240)); painter.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        painter.drawText(15, 145, item['title'])
+        
+        if self.current_tab == "CONTRACTS": self.draw_contracts_view(painter, item, w, h)
+        else: self.draw_bounties_view(painter, item, w, h)
+        
+        self.draw_footer(painter, w, h)
 
     def draw_header(self, painter):
         if self.logo_pixmap and not self.logo_pixmap.isNull():
@@ -243,12 +295,10 @@ class MercOverlayWidget(QWidget):
             painter.setBrush(QBrush(self.accent_yellow)); painter.drawRect(15, 15, 40, 40)
         
         painter.setPen(self.accent_yellow)
-        font_main = QFont("Segoe UI", 13, QFont.Weight.Bold)
-        painter.setFont(font_main)
+        painter.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         painter.drawText(65, 32, "MERCDIVERS PMC")
         
-        font_sub = QFont("Segoe UI", 11, QFont.Weight.Bold)
-        painter.setFont(font_sub)
+        painter.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         painter.drawText(220, 32, "CONTRACT ASSISTANT")
         
         status_color = QColor("#00ff00") if self.is_online else QColor("#ff4444")
@@ -343,11 +393,12 @@ class MercOverlayWidget(QWidget):
         painter.setPen(QColor(80, 80, 80)); painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
         now = datetime.datetime.now().strftime("%H:%M:%S")
         painter.drawText(15, h-10, f"TIME: {now}")
-        painter.drawText(w-120, h-10, "v.1.0 | By Turianel")
+        painter.drawText(w-120, h-10, "v.1.1 | By Turianel")
 
 class MercOverlayApp(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.settings = load_settings()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedSize(400, 580)
@@ -374,14 +425,14 @@ class MercOverlayApp(QMainWindow):
         self.input_timer.timeout.connect(self.process_native_input)
         self.input_timer.start(50)
         
-        self.numpad_was_pressed = False
+        self.toggle_was_pressed = False
+        self.update_was_pressed = False
+        
         QTimer.singleShot(100, lambda: self.set_clickthrough(True))
 
     def setup_tray(self):
         try:
             self.tray = QSystemTrayIcon(self)
-            
-            # Установка кастомной иконки из ресурсов
             logo_path = resource_path("PMC_Logo.webp")
             if os.path.exists(logo_path):
                 self.tray.setIcon(QIcon(logo_path))
@@ -389,10 +440,14 @@ class MercOverlayApp(QMainWindow):
                 self.tray.setIcon(QApplication.style().standardIcon(QApplication.style().StandardPixmap.SP_ComputerIcon))
                 
             menu = QMenu()
-            menu.addAction("Показать/Скрыть (Numpad 0)", self.toggle_visibility)
-            menu.addAction("Обновить сейчас", self.update_from_cloud)
+            toggle_key = self.settings.get('toggle_overlay', 'NUMPAD0')
+            update_key = self.settings.get('force_update', 'F5')
+            
+            menu.addAction(f"Toggle Visibility ({toggle_key})", self.toggle_visibility)
+            menu.addAction(f"Force Update ({update_key})", self.update_from_cloud)
             menu.addSeparator()
-            menu.addAction("Выход", QApplication.instance().quit)
+            menu.addAction("Exit", QApplication.instance().quit)
+            
             self.tray.setContextMenu(menu)
             self.tray.show()
         except: pass
@@ -400,7 +455,6 @@ class MercOverlayApp(QMainWindow):
     def update_from_cloud(self):
         if hasattr(self, 'net_worker') and self.net_worker.isRunning():
             return
-        
         self.net_worker = NetworkWorker(GIST_RAW_URL)
         self.net_worker.data_fetched.connect(self.on_data_fetched)
         self.net_worker.start()
@@ -455,17 +509,39 @@ class MercOverlayApp(QMainWindow):
     def process_native_input(self):
         try:
             if not self.is_game_active(): return
-            numpad_state = win32api.GetAsyncKeyState(win32con.VK_NUMPAD0) & 0x8000
-            if numpad_state:
-                if not self.numpad_was_pressed: self.toggle_visibility(); self.numpad_was_pressed = True
-            else: self.numpad_was_pressed = False
+            
+            # Key mappings from config
+            toggle_vk = VK_MAP.get(self.settings.get('toggle_overlay'), win32con.VK_NUMPAD0)
+            update_vk = VK_MAP.get(self.settings.get('force_update'), win32con.VK_F5)
+            interact_vk = VK_MAP.get(self.settings.get('interactive_mode'), win32con.VK_MENU)
+
+            # Check for toggle press
+            toggle_state = win32api.GetAsyncKeyState(toggle_vk) & 0x8000
+            if toggle_state:
+                if not self.toggle_was_pressed: 
+                    self.toggle_visibility()
+                    self.toggle_was_pressed = True
+            else: self.toggle_was_pressed = False
+                
+            # Check for update press
+            update_state = win32api.GetAsyncKeyState(update_vk) & 0x8000
+            if update_state:
+                if not self.update_was_pressed:
+                    self.update_from_cloud()
+                    self.update_was_pressed = True
+            else: self.update_was_pressed = False
             
             if not self.is_visible_master: return
-            is_alt_pressed = (win32api.GetAsyncKeyState(win32con.VK_MENU) & 0x8000) != 0
-            if is_alt_pressed and not self.is_interactive:
-                self.is_interactive = True; self.set_clickthrough(False); self.force_foreground(int(self.winId()))
-            elif not is_alt_pressed and self.is_interactive:
-                self.is_interactive = False; self.set_clickthrough(True)
+            
+            # Interactive mode (Holding the key)
+            is_interact_pressed = (win32api.GetAsyncKeyState(interact_vk) & 0x8000) != 0
+            if is_interact_pressed and not self.is_interactive:
+                self.is_interactive = True
+                self.set_clickthrough(False)
+                self.force_foreground(int(self.winId()))
+            elif not is_interact_pressed and self.is_interactive:
+                self.is_interactive = False
+                self.set_clickthrough(True)
                 if self.game_hwnd: self.force_foreground(self.game_hwnd)
         except: pass
 
@@ -485,11 +561,7 @@ class MercOverlayApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    # Установка иконки приложения (для панели задач)
     icon_path = resource_path("PMC_Logo.webp")
-    if os.path.exists(icon_path):
-        app.setWindowIcon(QIcon(icon_path))
-        
+    if os.path.exists(icon_path): app.setWindowIcon(QIcon(icon_path))
     window = MercOverlayApp()
     sys.exit(app.exec())
