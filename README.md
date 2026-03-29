@@ -21,10 +21,13 @@ This tool is a lightweight, non-intrusive overlay designed to display real-time 
 
 1.  **Download:** Go to the [Releases](https://github.com/Turianel/Mercdivers-Contract-Assistant/releases/tag/Release) section and download `MercTracker.exe`.
 2.  **Launch:** Run **HELLDIVERS™ 2** first (Borderless Windowed mode recommended), then start the assistant.
-3.  **Controls:**
+3.  **DEFAULT Controls:**
     * `Numpad 0`: Show / Hide the overlay.
     * `Left Alt (Hold)`: Enables mouse interaction (click tabs, scroll through objectives).
     * `Tray Icon`: Right-click for manual refresh or exit.
+    * `F5` Update contracts
+  
+4.At first launch, program will create **Settings.ini** You can change bindings yourself - Alt (LALT\RALT), Ctrl (LCTRL\RCTRL), Tilde (`), Insert, Home, F1-F12.   
 
 ---
 
@@ -37,8 +40,6 @@ So if you look at the code, you'll see comments in Russian and possibly some que
 **About the bot...** 
 This build is intended for my personal hosting and relies on data from the .env file. If you want to host your own bot, you'll have to either use SOCKS5 proxy or remove the it from the code entirely. i'll add example .env file
 
-**About the comments within the code...** 
-Yes, they're in Russian. Sorry about that. If you need these garbage comments, the translators will help without any problem.
 
 ---
 
