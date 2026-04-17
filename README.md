@@ -2,7 +2,7 @@
   <img src="PMC_Logo.webp" width="120" height="120">
 </p>
 
-<h1 align="center">Mercdivers Contract Assistant (v1.0)</h1>
+<h1 align="center">Mercdivers Contract Assistant (v1.1)</h1>
 
 **The official tactical overlay for the "Mercdivers" PMC operational coordination.**
 
@@ -19,7 +19,7 @@ This tool is a lightweight, non-intrusive overlay designed to display real-time 
 
 ## Installation & Usage
 
-1.  **Download:** Go to the [Releases](https://github.com/Turianel/Mercdivers-Contract-Assistant/releases/tag/Release) section and download `MercTracker.exe`.
+1.  **Download:** Go to the [Releases](https://github.com/Turianel/Mercdivers-Contract-Assistant/releases/latest) section and download `MercTracker.exe`.
 2.  **Launch:** Run **HELLDIVERS™ 2** first (Borderless Windowed mode recommended), then start the assistant.
 3.  **DEFAULT Controls:**
     * `Numpad 0`: Show / Hide the overlay.
